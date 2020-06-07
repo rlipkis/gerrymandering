@@ -1,0 +1,9 @@
+TODO:
+
+- experiment with different optimization algorithms
+- initial population distributions
+- add penalty for district inequality
+- resolve symmetry by ordering!
+
+Notes:
+- addition of penalty function can resolve local degeneracies
