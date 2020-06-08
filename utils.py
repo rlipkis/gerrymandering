@@ -113,9 +113,9 @@ class Configuration:
 ### population distributions
 
 def power_spectrum(kx, ky, alpha):
-		if kx != 0 or ky != 0:
-			return (kx**2 + ky**2)**(alpha/4)
-		return 0
+	if kx != 0 or ky != 0:
+		return (kx**2 + ky**2)**(alpha/4)
+	return 0
 		
 def gaussian_random_field(alpha, n):
 	noise = np.fft.fft2(np.random.normal(size=(n, n)))
