@@ -51,6 +51,8 @@ def diff_ev():
 	cstr = NonlinearConstraint(g, lb, ub)
 
 	# differential evolution
+	stdout = sys.stdout
+	sys.stdout = open('log.txt', 'w')
 	res = differential_evolution(f, bounds, args=(pop,), 
 		seed=0,
 		disp=True, 
@@ -59,6 +61,7 @@ def diff_ev():
 		constraints=cstr,
 		updating='deferred', 
 		workers=-1)
+	sys.stdout = stdout
 
 	# printing and logging
 	with open('xopt.txt', 'w') as log:
