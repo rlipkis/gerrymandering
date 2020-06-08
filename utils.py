@@ -118,6 +118,7 @@ def power_spectrum(kx, ky, alpha):
 	return 0
 		
 def gaussian_random_field(alpha, n):
+	# generates discretized scalar GRF
 	noise = np.fft.fft2(np.random.normal(size=(n, n)))
 	amplitude = np.zeros((n, n))
 	k = lambda i, n: ((i + n/2) % n) - n/2 # wavenumber
@@ -128,7 +129,7 @@ def gaussian_random_field(alpha, n):
 	return np.real(grf)
 
 def grf_distribution(alpha, n_samples, n_grid):
-	# discretized GRF
+	# interprets a GRF as a distribution and samples from it
 	g = gaussian_random_field(alpha, n=n_grid)
 	
 	# normalization
@@ -169,6 +170,7 @@ def g(x):
 ### solution analysis
 
 def vary(pop):
+	# returns a slightly varied copy of population 
 	sig = 0.01
 	pop_new = copy.deepcopy(pop)
 	for p in pop_new.register:
@@ -176,6 +178,7 @@ def vary(pop):
 	return pop_new
 
 def robustness(x, pop):
+	# analyzes cost distribution over m variations of the population
 	m = 100
 	costs = [Configuration(x, vary(pop)).cost for _ in range(m)]
 	plt.hist(costs)
