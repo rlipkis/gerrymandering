@@ -32,15 +32,15 @@ def f(x, *args):
 
 def g(x):
 	# inequality constraint function
-	p = 2 # norm
+	p = 1 # norm
 	x2 = np.abs(x)**p
 	return x2[:-2:2] + x2[1:-2:2] - (x2[2::2] + x2[3::2])
 
 def diff_ev():
 	# parameters
-	n = 1000
+	n = 1000 # 1000
 	k = 10
-	maxiter = 500 # was 10000
+	maxiter = 5000 # 10000
 
 	# initialize auxiliary structures
 	pop = Population()
@@ -51,8 +51,14 @@ def diff_ev():
 	cstr = NonlinearConstraint(g, lb, ub)
 
 	# differential evolution
-	res = differential_evolution(f_avg, bounds, args=(pop,), disp=True, polish=False,
-		maxiter=maxiter, constraints=cstr) #, updating='deferred', workers=-1)
+	res = differential_evolution(f, bounds, args=(pop,), 
+		seed=0,
+		disp=True, 
+		polish=False,
+		maxiter=maxiter, 
+		constraints=cstr,
+		updating='deferred', 
+		workers=-1)
 
 	# printing and logging
 	with open('xopt.txt', 'w') as log:
@@ -60,10 +66,10 @@ def diff_ev():
 	print(res)
 	c = Configuration(res.x, pop)
 	c.disp()
-	c.plot(pop)
+	# c.plot(pop)
 
 	# analysis
-	robustness(res.x, pop)
+	# robustness(res.x, pop)
 
 if __name__ == '__main__':
 	diff_ev()
