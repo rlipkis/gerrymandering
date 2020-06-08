@@ -5,9 +5,7 @@ from scipy.optimize import differential_evolution, NonlinearConstraint
 from collections import Counter
 import matplotlib.pyplot as plt
 from scipy.spatial import Voronoi, voronoi_plot_2d
-import time
 import copy
-import sys
 
 ### problem structure classes
 
@@ -30,7 +28,6 @@ class Population:
 			# GRF parameters
 			alpha = -3
 			n_grid = 100
-			# sampling
 			ws /= np.sum(ws) # normalize weights
 			for a, w in enumerate(ws):
 				n_samples = int(w*n)
@@ -53,8 +50,10 @@ class District():
 		self.n += 1
 		self.c[p.a] += 1
 
-	def majority(self): 
-		return self.c.most_common(1)[0][0]
+	def majority(self):
+		if sum(self.c.values()) > 0:
+			return self.c.most_common(1)[0][0]
+		return -1 # in the rare case of an empty counter
 
 class Configuration:
 	def __init__(self, x, pop):
@@ -76,20 +75,20 @@ class Configuration:
 			self.general[p.a] += 1
 		self.congress = Counter([d.majority() for d in self.districts])
 
-		# calculate distribution discrepancy (0 to 1)
-		disc = 0
+		# calculate preference inequality (0 to 1)
+		pref = 0
 		for a in self.general.keys():
-			disc += (self.general[a]/self.n - self.congress[a]/self.k)**2
-		self.disc = np.sqrt(disc/2)
-			
-		# calculate district population discrepancy (0 to (n-1)/n)
-		ineq = 0
+			pref += (self.general[a]/self.n - self.congress[a]/self.k)**2
+		self.pref = np.sqrt(pref/2)
+	
+		# calculate size inequality (0 to sqrt(k(k-1))/k)
+		size = 0
 		for d in self.districts:
-			ineq += np.abs(d.n - self.n/self.k)
-		self.ineq = ineq/(2*self.n)
+			size += (d.n/self.n - 1/self.k)**2
+		self.size = np.sqrt(size)
 
 		# total cost
-		self.cost = self.disc + self.ineq
+		self.cost = self.pref + self.size
 
 	def plot(self, pop):
 		centers = np.array([list(d.x) for d in self.districts])
@@ -106,8 +105,8 @@ class Configuration:
 		print('=================================')
 		print('general: {}'.format(self.general))
 		print('congress: {}'.format(self.congress))
-		print('disc: {0:.6f}'.format(self.disc))
-		print('ineq: {0:.6f}'.format(self.ineq))
+		print('pref ineq: {0:.6f}'.format(self.pref))
+		print('size ineq: {0:.6f}'.format(self.size))
 		print('cost: {0:.6f}'.format(self.cost))
 		print('=================================')
 
@@ -136,12 +135,36 @@ def grf_distribution(alpha, n_samples, n_grid):
 	g -= np.min(g)
 	g /= np.sum(g)
 
+	# intensity
+	beta = 4
+	g = g**beta
+	g /= np.sum(g)
+
 	# sampling
 	idx = np.random.choice(g.size, size=n_samples, p=g.flatten())
 	data = 1.0*np.array([list(np.unravel_index(i, g.shape)) for i in idx])
 	data += np.random.rand(data.shape[0], data.shape[1])
 	data /= n_grid
 	return data
+
+### optimization functions
+
+def f(x, *args):
+	# objective function
+	return Configuration(x, args[0]).cost
+
+def f_avg(x, *args):
+	# averaged objective function
+	n_avg = 10
+	pop = args[0]
+	costs = [f(x, vary(pop)) for _ in range(n_avg)]
+	return np.mean(costs)
+
+def g(x):
+	# inequality constraint function
+	p = 1 # norm
+	x2 = np.abs(x)**p
+	return x2[:-2:2] + x2[1:-2:2] - (x2[2::2] + x2[3::2])
 
 ### solution analysis
 
@@ -156,4 +179,24 @@ def robustness(x, pop):
 	m = 100
 	costs = [Configuration(x, vary(pop)).cost for _ in range(m)]
 	plt.hist(costs)
+	plt.show()
+
+### development and testing
+
+def dist_test():
+	n = 1000
+	k = 10
+	x = np.random.rand(2*k)
+	pop = Population()
+	pop.populate(n, ws=[0.7, 0.3], mode='grf')
+	c = Configuration(x, pop)
+	c.disp()
+	c.plot(pop)
+
+def grf_test():
+	alpha = -3
+	n_samples = 10000
+	n_grid = 100
+	data = grf_distribution(alpha, n_samples, n_grid)
+	plt.plot(data[:,0], data[:,1], 'k.', markersize=0.5)
 	plt.show()
