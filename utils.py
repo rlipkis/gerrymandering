@@ -6,8 +6,10 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from scipy.spatial import Voronoi, voronoi_plot_2d
 import time
+import copy
+import sys
 
-### problem classes
+### problem structure classes
 
 class Person:
 	def __init__(self, x, a):
@@ -109,31 +111,28 @@ class Configuration:
 		print('cost: {0:.6f}'.format(self.cost))
 		print('=================================')
 
-### other functions
-
-def indices(n):
-    a = np.arange(0, int(n/2+1))
-    b = np.arange(1, int(n/2))[::-1]
-    return np.concatenate((a, b))
+### population distributions
 
 def power_spectrum(kx, ky, alpha):
-        if kx == 0 and ky == 0:
-            return 0.0
-        return (kx**2 + ky**2)**(alpha/4)
-
+		if kx != 0 or ky != 0:
+			return (kx**2 + ky**2)**(alpha/4)
+		return 0
+		
 def gaussian_random_field(alpha, n):
-	# adapted from https://andrewwalker.github.io/statefultransitions
-    noise = np.fft.fft2(np.random.normal(size=(n, n)))
-    amplitude = np.zeros((n, n))
-    for i, kx in enumerate(indices(n)):
-        for j, ky in enumerate(indices(n)):        
-            amplitude[i, j] = power_spectrum(kx, ky, alpha)
-    grf = np.fft.ifft2(noise*amplitude)
-    return np.real(grf)
+	noise = np.fft.fft2(np.random.normal(size=(n, n)))
+	amplitude = np.zeros((n, n))
+	k = lambda i, n: ((i + n/2) % n) - n/2 # wavenumber
+	for i in range(n):
+		for j in range(n):
+			amplitude[i, j] = power_spectrum(k(i, n), k(j, n), alpha)
+	grf = np.fft.ifft2(noise*amplitude)
+	return np.real(grf)
 
 def grf_distribution(alpha, n_samples, n_grid):
-	# discretized generation
+	# discretized GRF
 	g = gaussian_random_field(alpha, n=n_grid)
+	
+	# normalization
 	g -= np.min(g)
 	g /= np.sum(g)
 
@@ -143,3 +142,18 @@ def grf_distribution(alpha, n_samples, n_grid):
 	data += np.random.rand(data.shape[0], data.shape[1])
 	data /= n_grid
 	return data
+
+### solution analysis
+
+def vary(pop):
+	sig = 0.01
+	pop_new = copy.deepcopy(pop)
+	for p in pop_new.register:
+		p.x += sig*np.random.randn(2)
+	return pop_new
+
+def robustness(x, pop):
+	m = 100
+	costs = [Configuration(x, vary(pop)).cost for _ in range(m)]
+	plt.hist(costs)
+	plt.show()

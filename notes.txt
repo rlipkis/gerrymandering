@@ -1,9 +1,131 @@
-TODO:
+Figures:
 
-- experiment with different optimization algorithms
-- initial population distributions
-- add penalty for district inequality
-- resolve symmetry by ordering!
+- examples of gerrymandering
+- voronoi regions
+- GRFs and sampled distributions
+- results
+	- solution sensitivity (histogram)
+- results with averaged cost
+	- solution sensitivity
 
-Notes:
-- addition of penalty function can resolve local degeneracies
+Paper:
+
+Optimal de-gerrymandering of voting districts with differential evolution
+
+INTRODUCTION:
+
+Gerrymandering is the practice of modifying the boundaries of voting districts in order to produce an electoral outcome that does not reflect the actual distribution of preference in the population. Specifically, in representative democracies in which each voting district elects a delegate to a congressional or parliamentary body (in winner-takes-all election), gerrymandering produces a gap between the preference distribution of the population and that of the congress.
+
+This can be effected in a number of ways. A particular faction of voters can be divided in order to ensure that they remain a minority in any given district, and thus elect no delegates. Alternately, a faction can be consolidated in order to ensure that they hold a majority in only one district, and thus elect a single delegate. Gerrymandering does not necessarily entail convoluted boundaries. Different choices of seemingly unbiased boundaries, such as a simple grid, can produce wildly different outcomes, depending on the specific parameters and placement. This often leads to gridlock in discussions of gerrymandering, as there is rarely a configuration that is both simple and completely neutral. Figure 1 shows an example of how district boundaries can affect the composition of a congress.
+
+* (footnote) Further complicating such discussions is the fact that one party typically has a vested interest in maintaining the disproportionate outcomes of gerrymandering, a phenomenon that this paper does not explore.
+
+PROBLEM STATEMENT:
+
+For a given population of n people, each with a location x_i in R^2 and affiliation a_i in {1...m}, draw k voting districts such that:
+- Districts are convex.
+- Districts have nearly equal populations.
+- The set of majority affiliations has a composition maximally similar to that of the general population.
+
+APPROACH:
+
+The districts can be specified by Voronoi regions
+- center c_i in R^2 defines region for which all points within are closer to c_i than to c_{j~=i}
+- intersections of halfspaces automatically satisfy convexity requirement
+- problem reduces to optimization over R^2k
+
+OBJECTIVE FUNCTION
+
+Objective function
+- takes a vector of the concatenated Voronoi centers
+- assigns population to appropriate districts
+- simulates voting for both general election and congressional delegates
+- specialized classes allows for efficient implementation of assignment and voting
+- computes "preference inequality": L_2 distance between normalized distribution of affiliations among general population and congressional delegates (scaled to lie between 0 and 1)
+- computes "size inequality": discrepancy of district sizes from an equal partition (scaled to lie between 0 and 1)
+	- this is effectively a penalty function
+	- necessary to prevent trivial solutions in which small districts are formed around especially partisan areas in order to satisfy preference equality
+- total cost is sum of the two inequalities
+
+Objective function analysis
+- extremely nonlinear
+	- local degeneracies: a change in the design variable can result in zero change in the objective (if it doesn’t change the allocation of people to districts)
+	- discontinuities: a small change in the design variable can result in a large change in the objective (if the new allocation tips a vote)
+- combinatorial symmetry: global n! degeneracy since the order of district centers doesn’t matter
+
+OPTIMIZATION
+
+Optimization algorithm
+- population methods 
+- genetic algorithm allows reasonably robust optimization of an extremely nonlinear function over a moderately high-dimensional space
+- differential evolution provides good heuristic for generating successful mutations
+- creates linear combinations of members of the candidate population
+
+OPTIMIZATION ISSUES
+
+- SciPy implementation is used
+- local degeneracies are mitigated somewhat by the addition of the two inequality costs
+- however, population methods are greatly obstructed by the combinatorial symmetry
+	- since the state vector is symmetric under re-orderings (in certain cases), the crossover procedure often fails to generate meaningful variation in the population
+	- this leads to a general failure of the GA to converge, since two candidates point can be very different in the design space, but identical in the underlying representation of district centers (and thus objective value)
+	- therefore, offspring tend to pull the population away from convergence
+- this symmetry is reducible by applying an ordering constraint
+	- all n! orderings are identical under some imposed ordering
+	- choose arbitrary reference c0 (such as origin or geographical center of population) and norm Lp
+	- impose |c1 - c0|p <= |c2 - c0|p <= ... <= |ck - c0|p
+	- no loss of generality: this restricted design space contains all possible unique solutions (in the underlying district representation)
+		- proof: for any [c1 ... cn] in original design space, there exists a single reordering from smallest to largest norm (assuming no equal values)
+		- this new design represents the same underlying solution and thus has the same objective value
+		- it satisfies the imposed constraints and thus lies in the feasible set of the constrained problem
+	- also useful is the fact that these constraints do not actually determine feasibility: if the genetic algorithm does explore "infeasible" solutions, they will still be perfectly valid (simply redundant)
+- under these constraints, the genetic algorithm performs much better
+
+POPULATION INITIALIZATION:
+
+- important to generate problems with non-trivial and feasible solutions
+- if there is two much homogeneity in the preference distribution, the problem can become degenerate (or simply boring), as there are many solutions that result in the same preference and size inequality
+- however, gerrymandering as a technique often takes advantage of the non-uniformity of preference
+- realistic population/preference distributions are generated by Gaussian random fields
+	- 2D analog to Gaussian processes
+	- used in physics to describe random systems for which the autocorrelation function is associated with a power spectrum
+	- by parameterizing the power spectrum with a power law, we can general random fields with different degrees of large-scale structure
+	- random fields can be shifted and normalized to represent a probability distribution
+- the population is then generated by specifying weights for the occurrence of each affiliation in the population
+	- for each affiliation, a GRF-distribution is generated and the appropriate number of people are sampled
+- this creates a population where affiliations tend to be concentrated
+- show examples (three different GRFs with different power laws, and the sampled versions)
+
+SOLUTION ANALYSIS:
+
+- optimality: a solution with a cost of zero rarely exists
+	- if affiliations are sufficiently spread out, there is no guarantee that equal districts can be formed for which every affiliation is represented by a majority in some district
+	- if an affiliation is an extreme minority to the extent that it cannot win a majority in any reasonably-sized district, it will likely be unrepresented
+- robustness: how does the solution withstand small population shifts
+	- if district centers are placed too precisely, a small change could completely change the preference inequality
+	- size inequality is more sensitive to changes in the design space (but has small effect on cost) while preference inequality changes much less often (discrete objective function with large effect)
+	- thus, the optimization often effectively occurs over size inequality while preference inequality remains constant
+	- thus, there is risk of the optimal point lying near the boundary of a constant preference inequality region
+	- this sort of undesirable fine-tuning can result in solutions that are extremely sensitive to small changes 
+- averaged optimization
+	- for each design point, the cost is averaged over an ensemble of populations with slight variations
+		- random noise is added to people's positions
+	- objective function is now "noisy", but simultaneously smoother, since discontinuities are softened
+	- leads to more trustworthy solutions
+	- obviously, leads to a proportional increase in computation
+
+RESULTS:
+
+The optimization was run for a two-affiliation system, which is sufficient to model many societies in which there are two dominant affiliations. The plots below show the best solution found for a population n, with affiliation weights [w1 w2] and k districts. 
+
+The ''desensitized'' solution over a ten-fold averaged objective function is shown below.
+
+DISCUSSION:
+
+- The point of this paper is not to suggest politically feasible solutions to the problem of gerrymandering. Rather, it is to examine a mathematical formulation of the problem and analyze the sorts of solutions that can be found.
+
+A fundamental question for many people is to what extent a representative democracy can be made to proportionally represent the interest of constituents.
+
+CODE
+
+- See GitHub repository
+
